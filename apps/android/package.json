@@ -1,0 +1,11 @@
+{
+  "name": "@do-task-manager/android",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "start": "expo start"
+  },
+  "dependencies": {
+    "@do-task-manager/shared": "file:../../packages/shared"
+  }
+}
