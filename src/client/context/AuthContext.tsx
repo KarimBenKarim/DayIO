@@ -12,12 +12,22 @@ interface AuthContextType {
   logout: () => void;
 }
 
-const apiClient = new TaskFlowApiClient();
+const webTokenStorage = {
+  getToken: () => (typeof window !== 'undefined' ? localStorage.getItem('taskmaster_token') : null),
+  setToken: (t: string | null) => {
+    if (typeof window !== 'undefined') {
+      if (t) localStorage.setItem('taskmaster_token', t);
+      else localStorage.removeItem('taskmaster_token');
+    }
+  },
+};
+
+const apiClient = new TaskFlowApiClient('/api', webTokenStorage.getToken(), webTokenStorage);
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
-  const [token, setToken] = useState<string | null>(apiClient.getToken());
+  const [token, setToken] = useState<string | null>(webTokenStorage.getToken());
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -27,7 +37,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           const res = await apiClient.getCurrentUser();
           setUser(res.user);
         } catch (err) {
-          apiClient.setToken(null);
+          await apiClient.setToken(null);
           setToken(null);
           setUser(null);
         }
@@ -49,8 +59,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setUser(res.user);
   };
 
-  const logout = () => {
-    apiClient.setToken(null);
+  const logout = async () => {
+    await apiClient.setToken(null);
     setToken(null);
     setUser(null);
   };

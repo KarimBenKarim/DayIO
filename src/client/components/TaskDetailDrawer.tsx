@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { useTasks } from '../context/TaskContext';
+import { useAuth } from '../context/AuthContext';
 import { X, Trash2, Calendar, Flag, Plus, Check, List as ListIcon } from 'lucide-react';
 import { Priority } from '../../../packages/shared/src/types';
 
 export const TaskDetailDrawer: React.FC = () => {
   const { selectedTask, setSelectedTask, deleteTask, addSubtask, toggleSubtask, lists, refreshTasks } = useTasks();
-  const { apiClient } = useTasks() as any; // context access
+  const { apiClient } = useAuth();
 
   const [notes, setNotes] = useState('');
   const [newSubtask, setNewSubtask] = useState('');

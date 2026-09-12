@@ -1,28 +1,35 @@
 import { AuthResponse, List, Task, Tag, Subtask, User } from './types.js';
 
+export interface TokenStorage {
+  getToken: () => string | null | Promise<string | null>;
+  setToken: (token: string | null) => void | Promise<void>;
+}
+
 export class TaskFlowApiClient {
   private baseUrl: string;
   private token: string | null = null;
+  private tokenStorage?: TokenStorage;
 
-  constructor(baseUrl: string = '/api') {
+  constructor(baseUrl: string = '/api', initialToken?: string | null, tokenStorage?: TokenStorage) {
     this.baseUrl = baseUrl;
-    if (typeof window !== 'undefined') {
-      this.token = localStorage.getItem('taskmaster_token');
+    this.token = initialToken || null;
+    this.tokenStorage = tokenStorage;
+  }
+
+  async setToken(token: string | null) {
+    this.token = token;
+    if (this.tokenStorage) {
+      await this.tokenStorage.setToken(token);
     }
   }
 
-  setToken(token: string | null) {
-    this.token = token;
-    if (typeof window !== 'undefined') {
-      if (token) {
-        localStorage.setItem('taskmaster_token', token);
-      } else {
-        localStorage.removeItem('taskmaster_token');
+  async getToken(): Promise<string | null> {
+    if (this.tokenStorage) {
+      const stored = await this.tokenStorage.getToken();
+      if (stored !== undefined) {
+        this.token = stored;
       }
     }
-  }
-
-  getToken(): string | null {
     return this.token;
   }
 
@@ -32,8 +39,9 @@ export class TaskFlowApiClient {
       ...(options.headers as Record<string, string>),
     };
 
-    if (this.token) {
-      headers['Authorization'] = `Bearer ${this.token}`;
+    const activeToken = await this.getToken();
+    if (activeToken) {
+      headers['Authorization'] = `Bearer ${activeToken}`;
     }
 
     const response = await fetch(`${this.baseUrl}${endpoint}`, {
@@ -55,7 +63,7 @@ export class TaskFlowApiClient {
       method: 'POST',
       body: JSON.stringify({ email, password, name }),
     });
-    this.setToken(res.token);
+    await this.setToken(res.token);
     return res;
   }
 
@@ -64,7 +72,7 @@ export class TaskFlowApiClient {
       method: 'POST',
       body: JSON.stringify({ email, password }),
     });
-    this.setToken(res.token);
+    await this.setToken(res.token);
     return res;
   }
 
