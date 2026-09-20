@@ -10,19 +10,36 @@ import {
   StatusBar,
   ActivityIndicator,
 } from 'react-native';
+import * as SecureStore from 'expo-secure-store';
 import { TaskFlowApiClient, TokenStorage } from '../../packages/shared/src/apiClient';
 import { Task, List } from '../../packages/shared/src/types';
 
-// Mobile Secure/Memory Storage Strategy
-let memoryToken: string | null = null;
-const mobileTokenStorage: TokenStorage = {
-  getToken: () => memoryToken,
-  setToken: (token) => {
-    memoryToken = token;
+const TOKEN_KEY = 'taskmaster_mobile_auth_token';
+
+// Persistent Expo SecureStore Strategy
+const expoTokenStorage: TokenStorage = {
+  getToken: async () => {
+    try {
+      return await SecureStore.getItemAsync(TOKEN_KEY);
+    } catch (e) {
+      return null;
+    }
+  },
+  setToken: async (token) => {
+    try {
+      if (token) {
+        await SecureStore.setItemAsync(TOKEN_KEY, token);
+      } else {
+        await SecureStore.deleteItemAsync(TOKEN_KEY);
+      }
+    } catch (e) {
+      console.error('Failed to update Expo SecureStore token:', e);
+    }
   },
 };
 
-const apiClient = new TaskFlowApiClient('http://10.0.2.2:3000/api', null, mobileTokenStorage);
+const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'http://10.0.2.2:3000/api';
+const apiClient = new TaskFlowApiClient(API_BASE_URL, null, expoTokenStorage);
 
 export default function App() {
   const [email, setEmail] = useState('');
@@ -31,6 +48,7 @@ export default function App() {
   const [isRegistering, setIsRegistering] = useState(false);
   const [loggedIn, setLoggedIn] = useState(false);
   const [user, setUser] = useState<any>(null);
+  const [initializing, setInitializing] = useState(true);
 
   // App Navigation & Task State
   const [activeTab, setActiveTab] = useState<'today' | 'upcoming' | 'inbox' | 'completed' | 'lists'>('today');
@@ -40,6 +58,26 @@ export default function App() {
   const [newListTitle, setNewListTitle] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+
+  // Initial Session Restoration Check
+  useEffect(() => {
+    async function restoreSession() {
+      try {
+        const storedToken = await expoTokenStorage.getToken();
+        if (storedToken) {
+          await apiClient.setToken(storedToken);
+          const meRes = await apiClient.getCurrentUser();
+          setUser(meRes.user);
+          setLoggedIn(true);
+        }
+      } catch (err) {
+        await apiClient.setToken(null);
+      } finally {
+        setInitializing(false);
+      }
+    }
+    restoreSession();
+  }, []);
 
   const fetchTaskData = async () => {
     setLoading(true);
@@ -83,6 +121,12 @@ export default function App() {
     }
   };
 
+  const handleLogout = async () => {
+    await apiClient.setToken(null);
+    setUser(null);
+    setLoggedIn(false);
+  };
+
   const handleCreateTask = async () => {
     if (!newTaskTitle.trim()) return;
     try {
@@ -117,6 +161,15 @@ export default function App() {
       setError(err.message || 'Could not create list');
     }
   };
+
+  if (initializing) {
+    return (
+      <SafeAreaView style={styles.authContainer}>
+        <ActivityIndicator size="large" color="#3b82f6" />
+        <Text style={[styles.subTitle, { marginTop: 12 }]}>Restoring session...</Text>
+      </SafeAreaView>
+    );
+  }
 
   if (!loggedIn) {
     return (
@@ -182,12 +235,7 @@ export default function App() {
       {/* Header */}
       <View style={styles.header}>
         <Text style={styles.userGreeting}>Hello, {user?.name || 'User'}</Text>
-        <TouchableOpacity
-          onPress={() => {
-            setLoggedIn(false);
-            apiClient.setToken(null);
-          }}
-        >
+        <TouchableOpacity onPress={handleLogout}>
           <Text style={styles.logoutText}>Logout</Text>
         </TouchableOpacity>
       </View>

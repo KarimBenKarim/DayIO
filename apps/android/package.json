@@ -9,6 +9,7 @@
   "dependencies": {
     "@do-task-manager/shared": "file:../../packages/shared",
     "expo": "~52.0.0",
+    "expo-secure-store": "~14.0.1",
     "react": "18.3.1",
     "react-native": "0.76.6"
   },
