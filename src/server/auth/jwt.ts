@@ -3,13 +3,18 @@ import jwt from 'jsonwebtoken';
 const isProd = process.env.NODE_ENV === 'production';
 const JWT_SECRET = process.env.JWT_SECRET;
 
-if (isProd && !JWT_SECRET) {
-  throw new Error('FATAL SECURITY ERROR: JWT_SECRET environment variable is missing in production environment.');
+if (!JWT_SECRET) {
+  if (isProd) {
+    throw new Error('FATAL SECURITY ERROR: JWT_SECRET environment variable is missing in production environment.');
+  }
 }
 
-const EFFECTIVE_SECRET = JWT_SECRET || 'dev-only-secret-key-change-for-production';
+const EFFECTIVE_SECRET = JWT_SECRET || 'test-dev-secret-key';
 
 export function generateToken(payload: { userId: string; email: string }): string {
+  if (!JWT_SECRET && isProd) {
+    throw new Error('JWT_SECRET environment variable is required');
+  }
   return jwt.sign(payload, EFFECTIVE_SECRET, { expiresIn: '7d' });
 }
 

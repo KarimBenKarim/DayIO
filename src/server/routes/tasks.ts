@@ -86,6 +86,15 @@ tasksRouter.post('/', (req: AuthenticatedRequest, res) => {
     return;
   }
 
+  // Enforce list ownership
+  if (list_id) {
+    const listRow = db.prepare('SELECT user_id FROM lists WHERE id = ?').get(list_id) as any;
+    if (!listRow || listRow.user_id !== userId) {
+      res.status(403).json({ error: 'Unauthorized: Invalid or foreign list ID' });
+      return;
+    }
+  }
+
   const taskId = crypto.randomUUID();
 
   db.prepare(`
@@ -126,33 +135,49 @@ tasksRouter.get('/:id', (req: AuthenticatedRequest, res) => {
 tasksRouter.put('/:id', (req: AuthenticatedRequest, res) => {
   const userId = req.user!.userId;
   const taskId = req.params.id as string;
-  const { title, notes, completed, list_id, due_date, due_time, priority, position, tags } = req.body;
 
-  const existing = db.prepare('SELECT id FROM tasks WHERE id = ? AND user_id = ?').get(taskId, userId);
+  const existing = db.prepare('SELECT * FROM tasks WHERE id = ? AND user_id = ?').get(taskId, userId) as any;
   if (!existing) {
     res.status(404).json({ error: 'Task not found' });
     return;
   }
 
-  const completedVal = completed !== undefined ? (completed ? 1 : 0) : undefined;
+  // Handle explicit null vs omitted fields
+  const title = 'title' in req.body ? req.body.title : existing.title;
+  const notes = 'notes' in req.body ? req.body.notes : existing.notes;
+  const completed = 'completed' in req.body ? (req.body.completed ? 1 : 0) : existing.completed;
+  const due_date = 'due_date' in req.body ? req.body.due_date : existing.due_date;
+  const due_time = 'due_time' in req.body ? req.body.due_time : existing.due_time;
+  const priority = 'priority' in req.body ? req.body.priority : existing.priority;
+  const position = 'position' in req.body ? req.body.position : existing.position;
+  const list_id = 'list_id' in req.body ? req.body.list_id : existing.list_id;
+
+  // Enforce list ownership if list_id is updated
+  if (list_id) {
+    const listRow = db.prepare('SELECT user_id FROM lists WHERE id = ?').get(list_id) as any;
+    if (!listRow || listRow.user_id !== userId) {
+      res.status(403).json({ error: 'Unauthorized: Invalid or foreign list ID' });
+      return;
+    }
+  }
 
   db.prepare(`
     UPDATE tasks
-    SET title = COALESCE(?, title),
-        notes = COALESCE(?, notes),
-        completed = COALESCE(?, completed),
-        list_id = COALESCE(?, list_id),
-        due_date = COALESCE(?, due_date),
-        due_time = COALESCE(?, due_time),
-        priority = COALESCE(?, priority),
-        position = COALESCE(?, position),
+    SET title = ?,
+        notes = ?,
+        completed = ?,
+        list_id = ?,
+        due_date = ?,
+        due_time = ?,
+        priority = ?,
+        position = ?,
         updated_at = CURRENT_TIMESTAMP
     WHERE id = ? AND user_id = ?
-  `).run(title, notes, completedVal, list_id, due_date, due_time, priority, position, taskId, userId);
+  `).run(title, notes, completed, list_id, due_date, due_time, priority, position, taskId, userId);
 
-  if (Array.isArray(tags)) {
+  if (Array.isArray(req.body.tags)) {
     db.prepare('DELETE FROM task_tags WHERE task_id = ?').run(taskId);
-    for (const tagName of tags) {
+    for (const tagName of req.body.tags) {
       if (typeof tagName !== 'string') continue;
       let tag = db.prepare('SELECT id FROM tags WHERE user_id = ? AND name = ?').get(userId, tagName) as any;
       let tagId = tag?.id;

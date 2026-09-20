@@ -1,4 +1,4 @@
-import { AuthResponse, List, Task, Tag, Subtask, User } from './types.js';
+import { AuthResponse, List, Task, Tag, Subtask, User } from './types';
 
 export interface TokenStorage {
   getToken: () => string | null | Promise<string | null>;

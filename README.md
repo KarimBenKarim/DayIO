@@ -29,13 +29,15 @@ Initialize SQLite database schema (`data/taskmaster.db`):
 npm run db:init
 ```
 
-### Running Development Server
+### Running Development Servers
 
+Terminal 1 (Backend API on port 3000):
 ```bash
-# Start backend server in dev mode
 npm run dev
+```
 
-# In another terminal, start Vite frontend dev server
+Terminal 2 (Frontend Dev Server on port 5173):
+```bash
 npm run dev:client
 ```
 
