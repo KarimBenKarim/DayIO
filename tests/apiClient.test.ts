@@ -37,7 +37,7 @@ describe('Shared TaskFlowApiClient Integration', () => {
     // 1. Register
     const auth = await client.register('clientuser@test.com', 'password123', 'Client User');
     expect(auth.user.email).toBe('clientuser@test.com');
-    expect(client.getToken()).toBe(auth.token);
+    expect(await client.getToken()).toBe(auth.token);
 
     // 2. Get Me
     const me = await client.getCurrentUser();

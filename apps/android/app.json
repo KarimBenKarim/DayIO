@@ -1,0 +1,14 @@
+{
+  "expo": {
+    "name": "TaskMaster",
+    "slug": "taskmaster",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "dark",
+    "ios": {
+      "supportsTablet": true
+    },
+    "android": {},
+    "web": {}
+  }
+}

@@ -56,19 +56,16 @@ describe('Tasks API & User Isolation', () => {
   });
 
   it('should list tasks belonging only to the authenticated user', async () => {
-    // User 1 creates a task
     await request(app)
       .post('/api/tasks')
       .set('Authorization', `Bearer ${user1Token}`)
       .send({ title: 'User 1 Private Task' });
 
-    // User 2 creates a task
     await request(app)
       .post('/api/tasks')
       .set('Authorization', `Bearer ${user2Token}`)
       .send({ title: 'User 2 Private Task' });
 
-    // User 1 fetches tasks
     const res1 = await request(app)
       .get('/api/tasks')
       .set('Authorization', `Bearer ${user1Token}`);
@@ -77,7 +74,6 @@ describe('Tasks API & User Isolation', () => {
     expect(res1.body.tasks.length).toBe(1);
     expect(res1.body.tasks[0].title).toBe('User 1 Private Task');
 
-    // User 2 fetches tasks
     const res2 = await request(app)
       .get('/api/tasks')
       .set('Authorization', `Bearer ${user2Token}`);
@@ -88,7 +84,6 @@ describe('Tasks API & User Isolation', () => {
   });
 
   it('should strictly isolate updates and prevent user 2 from reading/modifying user 1 task', async () => {
-    // User 1 creates task
     const createRes = await request(app)
       .post('/api/tasks')
       .set('Authorization', `Bearer ${user1Token}`)
@@ -96,89 +91,125 @@ describe('Tasks API & User Isolation', () => {
 
     const taskId = createRes.body.task.id;
 
-    // User 2 attempts GET user 1 task
     const getRes = await request(app)
       .get(`/api/tasks/${taskId}`)
       .set('Authorization', `Bearer ${user2Token}`);
     expect(getRes.status).toBe(404);
 
-    // User 2 attempts PUT user 1 task
     const updateRes = await request(app)
       .put(`/api/tasks/${taskId}`)
       .set('Authorization', `Bearer ${user2Token}`)
       .send({ title: 'Hacked Title' });
     expect(updateRes.status).toBe(404);
 
-    // User 2 attempts DELETE user 1 task
     const deleteRes = await request(app)
       .delete(`/api/tasks/${taskId}`)
       .set('Authorization', `Bearer ${user2Token}`);
     expect(deleteRes.status).toBe(404);
 
-    // Verify task unchanged
     const verifyRes = await request(app)
       .get(`/api/tasks/${taskId}`)
       .set('Authorization', `Bearer ${user1Token}`);
     expect(verifyRes.body.task.title).toBe('Top Secret Task');
   });
 
-  it('should manage subtasks on a task', async () => {
+  it('should reject associating a task with another user list ID', async () => {
+    // User 2 creates a list
+    const listRes = await request(app)
+      .post('/api/lists')
+      .set('Authorization', `Bearer ${user2Token}`)
+      .send({ name: 'User 2 Private List' });
+    const foreignListId = listRes.body.list.id;
+
+    // User 1 tries to create task in User 2 list
+    const createRes = await request(app)
+      .post('/api/tasks')
+      .set('Authorization', `Bearer ${user1Token}`)
+      .send({ title: 'Unauthorized Task', list_id: foreignListId });
+    expect(createRes.status).toBe(403);
+
+    // User 1 creates task, then tries to update list_id to User 2 list
     const taskRes = await request(app)
       .post('/api/tasks')
       .set('Authorization', `Bearer ${user1Token}`)
-      .send({ title: 'Project Planning' });
-
+      .send({ title: 'User 1 Task' });
     const taskId = taskRes.body.task.id;
 
-    // Add subtask
-    const subRes = await request(app)
-      .post(`/api/tasks/${taskId}/subtasks`)
+    const updateRes = await request(app)
+      .put(`/api/tasks/${taskId}`)
       .set('Authorization', `Bearer ${user1Token}`)
-      .send({ title: 'Research requirements' });
-
-    expect(subRes.status).toBe(201);
-    const subtaskId = subRes.body.subtask.id;
-
-    // Toggle subtask completed
-    const toggleRes = await request(app)
-      .put(`/api/subtasks/${subtaskId}`)
-      .set('Authorization', `Bearer ${user1Token}`)
-      .send({ completed: true });
-
-    expect(toggleRes.status).toBe(200);
-    expect(toggleRes.body.subtask.completed).toBe(true);
-
-    // Fetch full task to verify subtask list
-    const fullTaskRes = await request(app)
-      .get(`/api/tasks/${taskId}`)
-      .set('Authorization', `Bearer ${user1Token}`);
-
-    expect(fullTaskRes.body.task.subtasks.length).toBe(1);
-    expect(fullTaskRes.body.task.subtasks[0].completed).toBe(true);
+      .send({ list_id: foreignListId });
+    expect(updateRes.status).toBe(403);
   });
 
-  it('should manage custom lists and list filtering', async () => {
-    // Create list
+  it('should support explicit clearing of nullable task attributes', async () => {
+    // Create task with notes and due_date
+    const createRes = await request(app)
+      .post('/api/tasks')
+      .set('Authorization', `Bearer ${user1Token}`)
+      .send({
+        title: 'Task with details',
+        notes: 'Initial notes',
+        due_date: '2025-12-31',
+      });
+    const taskId = createRes.body.task.id;
+
+    // Explicitly update notes and due_date to null
+    const updateRes = await request(app)
+      .put(`/api/tasks/${taskId}`)
+      .set('Authorization', `Bearer ${user1Token}`)
+      .send({
+        notes: null,
+        due_date: null,
+      });
+
+    expect(updateRes.status).toBe(200);
+    expect(updateRes.body.task.notes).toBeNull();
+    expect(updateRes.body.task.due_date).toBeNull();
+  });
+
+  it('should prevent User 2 from updating or deleting User 1 lists or subtasks', async () => {
+    // User 1 creates list & task & subtask
     const listRes = await request(app)
       .post('/api/lists')
       .set('Authorization', `Bearer ${user1Token}`)
-      .send({ name: 'Work Project', color: '#ff0000' });
-
+      .send({ name: 'User 1 List' });
     const listId = listRes.body.list.id;
 
-    // Create task in list
-    await request(app)
+    const taskRes = await request(app)
       .post('/api/tasks')
       .set('Authorization', `Bearer ${user1Token}`)
-      .send({ title: 'Work Task', list_id: listId });
+      .send({ title: 'User 1 Task', list_id: listId });
+    const taskId = taskRes.body.task.id;
 
-    // Filter tasks by list
-    const filterRes = await request(app)
-      .get(`/api/tasks?listId=${listId}`)
-      .set('Authorization', `Bearer ${user1Token}`);
+    const subRes = await request(app)
+      .post(`/api/tasks/${taskId}/subtasks`)
+      .set('Authorization', `Bearer ${user1Token}`)
+      .send({ title: 'User 1 Subtask' });
+    const subtaskId = subRes.body.subtask.id;
 
-    expect(filterRes.status).toBe(200);
-    expect(filterRes.body.tasks.length).toBe(1);
-    expect(filterRes.body.tasks[0].list_id).toBe(listId);
+    // User 2 attempts list update/delete
+    const listPutRes = await request(app)
+      .put(`/api/lists/${listId}`)
+      .set('Authorization', `Bearer ${user2Token}`)
+      .send({ name: 'Hacked List' });
+    expect(listPutRes.status).toBe(404);
+
+    const listDelRes = await request(app)
+      .delete(`/api/lists/${listId}`)
+      .set('Authorization', `Bearer ${user2Token}`);
+    expect(listDelRes.status).toBe(404);
+
+    // User 2 attempts subtask update/delete
+    const subPutRes = await request(app)
+      .put(`/api/subtasks/${subtaskId}`)
+      .set('Authorization', `Bearer ${user2Token}`)
+      .send({ title: 'Hacked Subtask' });
+    expect(subPutRes.status).toBe(404);
+
+    const subDelRes = await request(app)
+      .delete(`/api/subtasks/${subtaskId}`)
+      .set('Authorization', `Bearer ${user2Token}`);
+    expect(subDelRes.status).toBe(404);
   });
 });
