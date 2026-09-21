@@ -1,7 +1,7 @@
 # Product Specification: TaskMaster MVP
 
 ## 1. Application Purpose & Scope
-TaskMaster is a private task-management web application inspired by core workflows of modern task management tools (such as Any.do). It prioritizes rapid task entry, high usability, minimal visual friction, and strict user data isolation.
+TaskMaster is a private, cross-platform task-management application inspired by core workflows of modern task management tools (such as Any.do). It prioritizes rapid task entry, high usability, minimal visual friction, and strict user data isolation across both Web and Android interfaces.
 
 **Scope Constraint:** Personal/private deployment designed for up to **6 users total**.
 
@@ -24,12 +24,13 @@ TaskMaster is a private task-management web application inspired by core workflo
 
 ---
 
-## 4. MVP Functionality
-* **Auth**: Secure JWT registration and login (capped at 6 users max).
+## 4. MVP Cross-Platform Parity
+* **Auth**: Secure JWT registration and login (capped at 6 users max) with platform-specific secure storage (`localStorage` on Web, `expo-secure-store` on Android).
 * **Task Management**: Create, view, edit notes/due date/priority, complete/uncomplete, and delete tasks.
-* **Views**: Today, Upcoming, Inbox, Completed, Custom Lists, and Tag filtering.
-* **Subtasks**: Add and toggle checklist subtasks per task.
-* **User Isolation**: SQL-level data scoping (`WHERE user_id = ?`).
+* **Views**: Today, Upcoming, Inbox, Completed, Custom Lists, and Tags.
+* **Subtasks**: Full subtask management (view, add, toggle completion, delete) across Web and Mobile.
+* **Date Semantics**: Standardized `YYYY-MM-DD` local system date calculations.
+* **User Isolation**: SQL-level data scoping (`WHERE user_id = ?`) with foreign list/tag ownership validation.
 
 ---
 
@@ -37,11 +38,11 @@ TaskMaster is a private task-management web application inspired by core workflo
 * Multi-user list sharing (`list_shares`).
 * Real-time push notifications / browser notifications.
 * Recurring task automated generation.
-* Mobile app client integration.
+* Offline caching and conflict resolution.
 
 ---
 
 ## 6. UX Decisions
 * **Fast Task Entry**: Fixed top QuickAdd input bar supporting inline priority, date, and tag selection.
-* **Contextual Drawer**: Clicking a task opens a details drawer without losing page context.
-* **Minimalist Aesthetic**: Dark-mode primary theme with responsive layout.
+* **Contextual Detail Interface**: Sliding detail drawer on Web and bottom sheet modal on Android.
+* **Minimalist Aesthetic**: Dark-mode primary theme with responsive web and native mobile layouts.

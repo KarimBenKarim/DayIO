@@ -1,33 +1,33 @@
 # Architecture Overview: TaskMaster
 
 ## 1. System Overview
-TaskMaster is built as a lightweight, single-process monorepo application using Express and React, backed by SQLite.
+TaskMaster is built as a lightweight, single-process monorepo application using Express and React, backed by SQLite, with a native React Native / Expo mobile client foundation.
 
 ```
-+-------------------------------------------------------------+
-|                      React Web SPA                          |
-+-------------------------------------------------------------+
-                              | REST APIs
-                              v
-+-------------------------------------------------------------+
-|                      Express Server                         |
-|  - JWT Auth Middleware      - REST Routes (Auth, Tasks...) |
-+-------------------------------------------------------------+
-                              | better-sqlite3
-                              v
-+-------------------------------------------------------------+
-|                      SQLite Database                        |
-+-------------------------------------------------------------+
++------------------------------------+    +------------------------------------+
+|           React Web SPA            |    |     React Native Android Client    |
++------------------------------------+    +------------------------------------+
+                   \                                 /
+                    \  REST APIs via @do-task-manager/shared
+                     \                             /
+                      v                           v
++------------------------------------------------------------------------------+
+|                                Express Server                                |
+|  - JWT Auth Middleware                     - REST Routes (Auth, Tasks...)     |
++------------------------------------------------------------------------------+
+                                       | better-sqlite3
+                                       v
++------------------------------------------------------------------------------+
+|                               SQLite Database                                |
++------------------------------------------------------------------------------+
 ```
 
 ---
 
-## 2. Frontend Architecture
-* **Framework**: React 19 + TypeScript.
-* **Styling**: Tailwind CSS v4.
-* **Icons**: Lucide React.
-* **State Management**: React Context (`AuthContext`, `TaskContext`).
-* **Client SDK**: Shared `TaskFlowApiClient` (`packages/shared`).
+## 2. Frontend & Mobile Architecture
+* **Web Client (`src/client`)**: React 19 + TypeScript, Tailwind CSS v4, Lucide React, Vite.
+* **Android Client (`apps/android`)**: React Native, Expo SDK 52, `expo-secure-store` for hardware-backed JWT storage.
+* **Shared SDK (`packages/shared`)**: Platform-agnostic domain types, `TaskFlowApiClient` abstraction, and date utilities (`getLocalDateString`).
 
 ---
 
@@ -39,6 +39,7 @@ TaskMaster is built as a lightweight, single-process monorepo application using 
 ---
 
 ## 4. Security & Data Isolation
-* Users cannot query or mutate data belonging to other users. Every query filters explicitly by `user_id`.
-* Passwords are salted and hashed using `bcryptjs` (cost factor 10).
-* Registration is capped at 6 users maximum.
+* Strict SQL user isolation (`WHERE user_id = ?`).
+* List and Tag ownership validation prevents unauthorized foreign list associations.
+* Passwords hashed using `bcryptjs` (cost factor 10).
+* Hard-coded 6-user registration limit for private deployment.
