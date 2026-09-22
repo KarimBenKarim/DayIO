@@ -8,6 +8,8 @@ declare module 'react-native' {
   export const SafeAreaView: any;
   export const StatusBar: any;
   export const ActivityIndicator: any;
+  export const Modal: any;
+  export const ScrollView: any;
 }
 
 declare module 'expo-secure-store' {
